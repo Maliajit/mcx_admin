@@ -21,6 +21,18 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'gst_number',
+        'pan_number',
+        'pan_image_path',
+        'aadhaar_number',
+        'aadhaar_front_image_path',
+        'aadhaar_back_image_path',
+        'selfie_image_path',
+        'selfie_reference',
+        'kyc_status',
+        'kyc_submitted_at',
+        'kyc_verified_at',
         'password',
     ];
 
@@ -43,6 +55,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'kyc_submitted_at' => 'datetime',
+            'kyc_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

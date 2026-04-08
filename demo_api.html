@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Gold Rates</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #111;
+            color: #fff;
+            text-align: center;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 80%;
+            background: #222;
+        }
+
+        th, td {
+            border: 1px solid #444;
+            padding: 10px;
+        }
+
+        th {
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Live Gold & Silver Rates</h1>
+
+<table id="ratesTable">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Bid</th>
+            <th>Ask</th>
+            <th>High</th>
+            <th>Low</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td colspan="5">Loading...</td></tr>
+    </tbody>
+</table>
+
+
+<script>
+async function fetchRates() {
+    const tbody = document.querySelector("#ratesTable tbody");
+
+    try {
+        const timestamp = Date.now();
+
+        const url = `https://bcast.suvidhigold.in:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/suvidhi?_=${timestamp}`;
+
+        const res = await axios.get(url);
+
+        const raw = res.data.trim().split("\n");
+
+        let rows = "";
+
+        raw.forEach(line => {
+            const parts = line.split("\t")
+                .map(p => p.trim())
+                .filter(p => p !== "");
+
+            if (parts.length < 6) return;
+
+            const name = parts[1];
+            const bid = parseFloat(parts[2]);
+            const ask = parseFloat(parts[3]);
+            const high = parseFloat(parts[4]);
+            const low = parseFloat(parts[5]);
+
+            rows += `
+                <tr>
+                    <td>${name}</td>
+                    <td>${!isNaN(bid) ? "₹ " + bid.toFixed(2) : "-"}</td>
+                    <td>${!isNaN(ask) ? "₹ " + ask.toFixed(2) : "-"}</td>
+                    <td>${!isNaN(high) ? "₹ " + high.toFixed(2) : "-"}</td>
+                    <td>${!isNaN(low) ? "₹ " + low.toFixed(2) : "-"}</td>
+                </tr>
+            `;
+        });
+
+        if (!rows) {
+            rows = "<tr><td colspan='5'>No valid data found</td></tr>";
+        }
+
+        tbody.innerHTML = rows;
+
+    } catch (err) {
+        console.error("Error:", err);
+        tbody.innerHTML = "<tr><td colspan='5'>Failed to load data</td></tr>";
+    }
+}
+
+// ✅ call OUTSIDE function
+fetchRates();
+setInterval(fetchRates, 500);
+</script>
+
+
+
+</body>
+</html>

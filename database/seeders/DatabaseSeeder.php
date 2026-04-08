@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'phone' => '+91 9999999999',
+            'kyc_status' => 'unverified',
         ]);
     }
 }

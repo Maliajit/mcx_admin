@@ -4,39 +4,62 @@
 @section('page_title', 'Market Rates')
 
 @section('content')
-<div style="max-width: 600px;">
-    <div class="section-card">
-        <div class="section-header">
-            <h3>Update Gold Rate</h3>
-        </div>
-        <div style="padding: 32px;">
-            <div class="form-group">
-                <label>Current Gold Price (per 10g)</label>
-                <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 24px;">₹72,450.00</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="gold_rate">New Gold Price</label>
-                <input type="number" id="gold_rate" class="form-control" placeholder="Enter new price" style="font-size: 1.5rem; height: 60px;">
-            </div>
-            
-            <button class="btn btn-accent" style="width: 100%; height: 50px; font-size: 1.1rem;">Update Gold Rate</button>
-        </div>
+<div class="section-card">
+    <div class="section-header">
+        <h3>Live Gold Rates</h3>
     </div>
-    
-    <div class="section-card">
-        <div class="section-header">
-            <h3>Auto-Update Settings</h3>
-        </div>
-        <div style="padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <p style="font-weight: 700; color: var(--primary);">Real-time MCX Sync</p>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">Automatically update rates from MCX feed</p>
-                </div>
-                <button class="btn btn-success btn-sm">Enabled</button>
-            </div>
-        </div>
-    </div>
+    <div id="gold-rates-panel" style="padding: 24px;">Loading live gold rates...</div>
 </div>
+
+<script>
+async function loadGoldRates() {
+    const panel = document.getElementById('gold-rates-panel');
+
+    try {
+        const response = await fetch('/api/v1/live-rates');
+        const payload = await response.json();
+        const data = payload.data || {};
+        const items = (data.items || []).filter(item => item.name.toUpperCase().includes('GOLD'));
+
+        if (!items.length) {
+            panel.innerHTML = '<p>No live gold instruments are available from the feed.</p>';
+            return;
+        }
+
+        panel.innerHTML = `
+            <p style="margin-bottom: 16px; color: ${data.is_stale ? '#b45309' : 'var(--text-secondary)'};">
+                Source: ${data.source} | Served at: ${data.served_at}
+            </p>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Bid</th>
+                            <th>Ask</th>
+                            <th>High</th>
+                            <th>Low</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(item => `
+                            <tr>
+                                <td>${item.name}</td>
+                                <td>${item.bid}</td>
+                                <td>${item.ask}</td>
+                                <td>${item.high}</td>
+                                <td>${item.low}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } catch (error) {
+        panel.innerHTML = '<p style="color: var(--danger);">Unable to load live gold rates.</p>';
+    }
+}
+
+loadGoldRates();
+</script>
 @endsection
