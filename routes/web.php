@@ -22,10 +22,12 @@ Route::post('/admin/kyc/{verifiedUser}/reject', [KycRequestsController::class, '
 // Order Management
 Route::get('/admin/orders', [OrderPagesController::class, 'index'])->name('orders.index');
 Route::get('/admin/orders/pending', [OrderPagesController::class, 'pending'])->name('orders.pending');
+Route::get('/admin/orders/process-limits', [OrderPagesController::class, 'processLimits'])->name('orders.process-limits');
 Route::get('/admin/orders/completed', [OrderPagesController::class, 'completed'])->name('orders.completed');
 Route::get('/admin/orders/{order}', [OrderPagesController::class, 'show'])->name('orders.show')->whereNumber('order');
 Route::post('/admin/orders/{order}/approve', [OrderPagesController::class, 'approve'])->name('orders.approve');
 Route::post('/admin/orders/{order}/reject', [OrderPagesController::class, 'reject'])->name('orders.reject');
+Route::post('/admin/orders/{order}/deliver', [OrderPagesController::class, 'deliver'])->name('orders.deliver');
 
 // Market & Reports
 Route::view('/admin/rates/gold', 'admin.rates.gold.index');

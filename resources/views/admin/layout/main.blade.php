@@ -30,6 +30,24 @@
     </div>
 
     <script src="{{ asset('assets/js/app.js') }}"></script>
+    <script>
+        // Automatic Limit Order Processing Heartbeat
+        // Process hits every 2 seconds while admin is active
+        setInterval(function() {
+            fetch("{{ route('orders.process-limits') }}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.processed_count > 0) {
+                        console.log('Automated Trade Hit: ' + data.processed_count + ' orders confirmed.');
+                        // Optionally refresh the current page if it's the pending list
+                        if (window.location.href.indexOf('orders/pending') > -1) {
+                             window.location.reload();
+                        }
+                    }
+                })
+                .catch(err => console.error('Heartbeat failed:', err));
+        }, 2000);
+    </script>
     @stack('js')
 </body>
 </html>

@@ -89,7 +89,7 @@ class OrdersController extends Controller
         $taxes = $this->priceService->calculateOrderTaxes($executionPrice, $payload['quantity']);
 
         // 5. Create Order
-        $status = $payload['type'] === 'market' ? 'pending' : 'waiting';
+        $status = $payload['type'] === 'market' ? 'confirmed' : 'pending';
 
         $order = Order::query()->create([
             'user_id' => $user->id,
@@ -126,8 +126,8 @@ class OrdersController extends Controller
             'total' => number_format((float) $order->total, 2, '.', ''),
             'target_price' => $order->target_price ? number_format((float) $order->target_price, 2, '.', '') : null,
             'status' => $order->status,
-            'placed_at' => optional($order->placed_at)->toIso8601String(),
-            'approved_at' => optional($order->approved_at)->toIso8601String(),
+            'placed_at' => $order->placed_at ? $order->placed_at->toIso8601String() : null,
+            'approved_at' => $order->approved_at ? $order->approved_at->toIso8601String() : null,
         ];
     }
 }

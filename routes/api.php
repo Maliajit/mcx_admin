@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/auth/send-otp', [AuthController::class, 'sendOtp']);
     Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::get('/auth/settings', AuthSettingsController::class);
+    Route::get('/login', fn() => response()->json(['message' => 'Unauthenticated.'], 401))->name('login');
 
     // Dynamic Configuration & Home Data (Public for initial app load)
     Route::get('/config', [AppConfigController::class, 'index']);

@@ -34,7 +34,7 @@ class ProfileController extends Controller
                     'full_name' => $kyc->full_name,
                     'pan' => $kyc->pan_number,
                     'aadhaar' => $kyc->aadhaar_number,
-                    'submitted_at' => $kyc->created_at->toIso8601String(),
+                    'submitted_at' => $kyc->created_at ? $kyc->created_at->toIso8601String() : null,
                 ] : null,
             ],
             'auth' => [
