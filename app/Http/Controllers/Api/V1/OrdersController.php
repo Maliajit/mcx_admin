@@ -32,9 +32,9 @@ class OrdersController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve();
+        $user = $this->userResolver->resolve($request);
 
-        if ($user->kyc_status !== 'verified') {
+        if (!$user->is_verified) {
             return ApiResponse::error(
                 'KYC verification is required before placing an order.',
                 403,
@@ -42,30 +42,40 @@ class OrdersController extends Controller
                     'code' => 'kyc_required',
                     'profile' => [
                         'is_verified' => false,
-                        'kyc_status' => $user->kyc_status,
+                    ],
+                ],
+            );
+        }
+
+        if (!$user->can_trade) {
+            return ApiResponse::error(
+                'Trading is not enabled for your account.',
+                403,
+                [
+                    'code' => 'trading_disabled',
+                    'profile' => [
+                        'can_trade' => false,
                     ],
                 ],
             );
         }
 
         $payload = $request->validate([
-            'customer_name' => ['nullable', 'string', 'max:255'],
-            'customer_phone' => ['nullable', 'string', 'max:255'],
-            'asset' => ['required', 'string', 'max:255'],
-            'side' => ['required', 'string', Rule::in(['buy', 'sell'])],
-            'order_type' => ['required', 'string', Rule::in(['market', 'pending'])],
-            'quantity' => ['required', 'numeric', 'min:0.01'],
+            'asset_name' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'string', Rule::in(['market', 'limit'])],
             'price' => ['required', 'numeric', 'min:0'],
-            'total' => ['required', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string'],
+            'target_price' => ['nullable', 'numeric', 'min:0', 'required_if:type,limit'],
         ]);
+
+        $status = $payload['type'] === 'market' ? 'pending' : 'waiting';
 
         $order = Order::query()->create([
             'user_id' => $user->id,
-            'customer_name' => $payload['customer_name'] ?? $user->name,
-            'customer_phone' => $payload['customer_phone'] ?? $user->phone,
-            ...$payload,
-            'status' => 'pending',
+            'asset' => $payload['asset_name'],
+            'type' => $payload['type'],
+            'price' => $payload['price'],
+            'target_price' => $payload['target_price'] ?? null,
+            'status' => $status,
             'placed_at' => now(),
         ]);
 
@@ -75,25 +85,18 @@ class OrdersController extends Controller
         ], 201);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function mapOrder(Order $order): array
     {
         return [
             'id' => $order->id,
             'user_id' => $order->user_id,
-            'customer_name' => $order->customer_name,
-            'customer_phone' => $order->customer_phone,
-            'asset' => $order->asset,
-            'side' => $order->side,
-            'order_type' => $order->order_type,
-            'quantity' => number_format((float) $order->quantity, 2, '.', ''),
+            'asset_name' => $order->asset,
+            'type' => $order->type,
             'price' => number_format((float) $order->price, 2, '.', ''),
-            'total' => number_format((float) $order->total, 2, '.', ''),
+            'target_price' => $order->target_price ? number_format((float) $order->target_price, 2, '.', '') : null,
             'status' => $order->status,
-            'notes' => $order->notes,
             'placed_at' => optional($order->placed_at)->toIso8601String(),
+            'approved_at' => optional($order->approved_at)->toIso8601String(),
         ];
     }
 }

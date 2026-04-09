@@ -4,11 +4,25 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\Request;
 
 class LocalAppUserResolver
 {
-    public function resolve(): User
+    public function resolve(Request $request = null): User
     {
+        // Check if we have a session token (from OTP login)
+        $sessionToken = $request?->header('Authorization') ?? $request?->input('session_token');
+
+        if ($sessionToken && str_starts_with($sessionToken, 'mock-session-')) {
+            $userId = (int) str_replace('mock-session-', '', $sessionToken);
+            $user = User::find($userId);
+
+            if ($user) {
+                return $user;
+            }
+        }
+
+        // Fallback to demo user for development
         /** @var User $user */
         $user = User::query()->firstOrCreate(
             ['email' => (string) config('api.auth.demo_profile.email')],

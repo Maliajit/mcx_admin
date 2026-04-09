@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\LocalAppUserResolver;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
@@ -14,21 +15,28 @@ class ProfileController extends Controller
     ) {
     }
 
-    public function __invoke(): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve();
+        $user = $this->userResolver->resolve($request);
+
+        $latestKycRequest = $user->kycRequests()->latest()->first();
 
         return ApiResponse::success([
             'profile' => [
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
-                'gst_number' => $user->gst_number,
-                'pan_number' => $user->pan_number,
-                'aadhaar_number' => $user->aadhaar_number,
-                'kyc_status' => $user->kyc_status,
-                'is_verified' => $user->kyc_status === 'verified',
-                'kyc_verified_at' => optional($user->kyc_verified_at)->toIso8601String(),
+                'is_verified' => $user->is_verified,
+                'can_trade' => $user->can_trade,
+                'kyc_request' => $latestKycRequest ? [
+                    'id' => $latestKycRequest->id,
+                    'name' => $latestKycRequest->name,
+                    'pan' => $latestKycRequest->pan,
+                    'aadhaar' => $latestKycRequest->aadhaar,
+                    'status' => $latestKycRequest->status,
+                    'created_at' => $latestKycRequest->created_at->toIso8601String(),
+                    'approved_at' => optional($latestKycRequest->approved_at)->toIso8601String(),
+                ] : null,
             ],
             'auth' => [
                 'type' => 'local',

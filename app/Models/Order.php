@@ -22,6 +22,10 @@ class Order extends Model
         'status',
         'notes',
         'placed_at',
+        'type',
+        'target_price',
+        'approved_by',
+        'approved_at',
     ];
 
     protected function casts(): array
@@ -31,6 +35,18 @@ class Order extends Model
             'price' => 'decimal:2',
             'total' => 'decimal:2',
             'placed_at' => 'datetime',
+            'target_price' => 'decimal:2',
+            'approved_at' => 'datetime',
         ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

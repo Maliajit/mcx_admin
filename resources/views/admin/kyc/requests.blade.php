@@ -1,7 +1,6 @@
 @extends('admin.layout.main')
 
-@section('title', 'Pending Orders')
-@section('page_title', 'Pending Orders')
+@section('title', 'KYC Requests')
 
 @section('content')
 <div class="container-fluid">
@@ -9,7 +8,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Pending Orders</h3>
+                    <h3 class="card-title">KYC Requests</h3>
                 </div>
                 <div class="card-body">
                     @if(session('success'))
@@ -18,47 +17,49 @@
                     @if(session('error'))
                         <div class="alert alert-danger">{{ session('error') }}</div>
                     @endif
-                    @if($orders->isEmpty())
-                        <p>No pending orders.</p>
-                    @else
                     <table class="table table-bordered">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Asset</th>
-                                <th>Type</th>
-                                <th>Price</th>
-                                <th>Target Price</th>
+                                <th>User</th>
+                                <th>Name</th>
+                                <th>PAN</th>
+                                <th>Aadhaar</th>
                                 <th>Status</th>
-                                <th>Placed At</th>
+                                <th>Created At</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($orders as $order)
+                            @foreach($kycRequests as $request)
                             <tr>
-                                <td>{{ $order->id }}</td>
-                                <td>{{ $order->asset }}</td>
-                                <td><span class="badge badge-info">{{ ucfirst($order->type) }}</span></td>
-                                <td>{{ $order->price }}</td>
-                                <td>{{ $order->target_price ?? 'N/A' }}</td>
-                                <td><span class="badge badge-warning">{{ ucfirst($order->status) }}</span></td>
-                                <td>{{ $order->placed_at->format('d/m/Y H:i') }}</td>
+                                <td>{{ $request->id }}</td>
+                                <td>{{ $request->user->email }}</td>
+                                <td>{{ $request->name }}</td>
+                                <td>{{ $request->pan }}</td>
+                                <td>{{ $request->aadhaar }}</td>
                                 <td>
-                                    <form method="POST" action="{{ route('orders.approve', $order) }}" style="display: inline;">
+                                    <span class="badge badge-{{ $request->status === 'pending' ? 'warning' : ($request->status === 'approved' ? 'success' : 'danger') }}">
+                                        {{ ucfirst($request->status) }}
+                                    </span>
+                                </td>
+                                <td>{{ $request->created_at->format('d/m/Y H:i') }}</td>
+                                <td>
+                                    @if($request->status === 'pending')
+                                    <form method="POST" action="{{ route('admin.kyc.approve', $request) }}" style="display: inline;">
                                         @csrf
                                         <button type="submit" class="btn btn-success btn-sm">Approve</button>
                                     </form>
-                                    <form method="POST" action="{{ route('orders.reject', $order) }}" style="display: inline;">
+                                    <form method="POST" action="{{ route('admin.kyc.reject', $request) }}" style="display: inline;">
                                         @csrf
                                         <button type="submit" class="btn btn-danger btn-sm">Reject</button>
                                     </form>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach
                         </tbody>
                     </table>
-                    @endif
                 </div>
             </div>
         </div>

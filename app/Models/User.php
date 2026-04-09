@@ -33,6 +33,8 @@ class User extends Authenticatable
         'kyc_status',
         'kyc_submitted_at',
         'kyc_verified_at',
+        'is_verified',
+        'can_trade',
         'password',
     ];
 
@@ -59,5 +61,15 @@ class User extends Authenticatable
             'kyc_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function kycRequests()
+    {
+        return $this->hasMany(KycRequest::class);
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
     }
 }

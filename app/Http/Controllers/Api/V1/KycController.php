@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\LocalAppUserResolver;
+use App\Models\KycRequest;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Services\LocalAppUserResolver;
 
 class KycController extends Controller
 {
@@ -20,58 +20,38 @@ class KycController extends Controller
     {
         $payload = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
-            'phone' => ['required', 'string', 'max:50'],
-            'gst_number' => ['nullable', 'string', 'max:50'],
-            'pan_number' => ['required', 'string', 'max:20'],
-            'aadhaar_number' => ['required', 'string', 'max:20'],
-            'pan_image' => ['required', 'image', 'max:5120'],
-            'aadhaar_front_image' => ['required', 'image', 'max:5120'],
-            'aadhaar_back_image' => ['required', 'image', 'max:5120'],
-            'selfie_image' => ['required', 'image', 'max:5120'],
+            'pan' => ['required', 'string', 'max:20'],
+            'aadhaar' => ['required', 'string', 'max:20'],
         ]);
 
-        $user = $this->userResolver->resolve();
-        $panImagePath = $request->file('pan_image')->store('kyc/pan', 'public');
-        $aadhaarFrontImagePath = $request->file('aadhaar_front_image')->store('kyc/aadhaar-front', 'public');
-        $aadhaarBackImagePath = $request->file('aadhaar_back_image')->store('kyc/aadhaar-back', 'public');
-        $selfieImagePath = $request->file('selfie_image')->store('kyc/selfie', 'public');
+        $user = $this->userResolver->resolve($request);
 
-        $user->fill([
+        // Check if user already has a pending or approved KYC request
+        $existingRequest = KycRequest::where('user_id', $user->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->first();
+
+        if ($existingRequest) {
+            return ApiResponse::error('KYC request already exists.', 400);
+        }
+
+        $kycRequest = KycRequest::create([
+            'user_id' => $user->id,
             'name' => $payload['name'],
-            'email' => $payload['email'],
-            'phone' => $payload['phone'],
-            'gst_number' => $payload['gst_number'] ?? null,
-            'pan_number' => strtoupper($payload['pan_number']),
-            'pan_image_path' => $panImagePath,
-            'aadhaar_number' => preg_replace('/\s+/', '', $payload['aadhaar_number']),
-            'aadhaar_front_image_path' => $aadhaarFrontImagePath,
-            'aadhaar_back_image_path' => $aadhaarBackImagePath,
-            'selfie_reference' => basename($selfieImagePath),
-            'selfie_image_path' => $selfieImagePath,
-            'kyc_status' => 'verified',
-            'kyc_submitted_at' => now(),
-            'kyc_verified_at' => now(),
+            'pan' => strtoupper($payload['pan']),
+            'aadhaar' => preg_replace('/\s+/', '', $payload['aadhaar']),
         ]);
-        $user->save();
 
         return ApiResponse::success([
-            'profile' => [
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'is_verified' => true,
-                'kyc_status' => $user->kyc_status,
-                'pan_number' => $user->pan_number,
-                'pan_image_url' => $user->pan_image_path ? Storage::disk('public')->url($user->pan_image_path) : null,
-                'aadhaar_number' => $user->aadhaar_number,
-                'aadhaar_front_image_url' => $user->aadhaar_front_image_path ? Storage::disk('public')->url($user->aadhaar_front_image_path) : null,
-                'aadhaar_back_image_url' => $user->aadhaar_back_image_path ? Storage::disk('public')->url($user->aadhaar_back_image_path) : null,
-                'selfie_image_url' => $user->selfie_image_path ? Storage::disk('public')->url($user->selfie_image_path) : null,
-                'gst_number' => $user->gst_number,
-                'kyc_verified_at' => optional($user->kyc_verified_at)->toIso8601String(),
+            'kyc_request' => [
+                'id' => $kycRequest->id,
+                'name' => $kycRequest->name,
+                'pan' => $kycRequest->pan,
+                'aadhaar' => $kycRequest->aadhaar,
+                'status' => $kycRequest->status,
+                'created_at' => $kycRequest->created_at->toIso8601String(),
             ],
-            'message' => 'KYC submitted and verified successfully.',
+            'message' => 'KYC request submitted successfully.',
         ]);
     }
 }

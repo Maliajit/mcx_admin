@@ -40,9 +40,9 @@ return [
             'LIVE_RATES_URL',
             'https://bcast.suvidhigold.in:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/suvidhi'
         ),
-        'timeout_seconds' => env('LIVE_RATES_TIMEOUT_SECONDS', 3),
-        'connect_timeout_seconds' => env('LIVE_RATES_CONNECT_TIMEOUT_SECONDS', 2),
-        'cache_ttl_seconds' => env('LIVE_RATES_CACHE_TTL_SECONDS', 3),
+        'timeout_seconds' => env('LIVE_RATES_TIMEOUT_SECONDS', 15),
+        'connect_timeout_seconds' => env('LIVE_RATES_CONNECT_TIMEOUT_SECONDS', 5),
+        'cache_ttl_seconds' => env('LIVE_RATES_CACHE_TTL_SECONDS', 5),
         'rate_limit_per_minute' => env('LIVE_RATES_RATE_LIMIT_PER_MINUTE', 60),
     ],
 
