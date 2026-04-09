@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\KycRequest;
 use App\Models\User;
+use App\Models\VerifiedUser;
 use App\Services\OtpService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -18,73 +18,130 @@ class AuthController extends Controller
     ) {
     }
 
+    /**
+     * Send OTP to the mobile number.
+     * 
+     * POST /api/v1/send-otp
+     */
     public function sendOtp(Request $request): JsonResponse
     {
         $payload = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\+91\s\d{10}$/'],
+            'mobile' => ['required', 'string', 'regex:/^\d{10}$/'],
         ]);
 
-        $phone = $payload['phone'];
+        $mobile = $payload['mobile'];
 
-        // Generate and send OTP
-        $otp = $this->otpService->generateOtp($phone);
+        // Generate and send OTP (Using OtpService which uses Cache)
+        $otp = $this->otpService->generateOtp($mobile);
+
+        // Save OTP to auth_users table for redundant verification / audit
+        User::updateOrCreate(
+            ['mobile' => $mobile],
+            ['otp' => $otp, 'otp_verified' => false]
+        );
 
         return ApiResponse::success([
             'message' => 'OTP sent successfully.',
-            'phone' => $phone,
-            // In production, remove this - OTP should only be logged
-            'otp_for_testing' => $otp,
+            'mobile' => $mobile,
+            'otp_for_testing' => $otp, // Remove in production
         ]);
     }
 
+    /**
+     * Verify OTP and issue Sanctum token.
+     * 
+     * POST /api/v1/verify-otp
+     */
     public function verifyOtp(Request $request): JsonResponse
     {
         $payload = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\+91\s\d{10}$/'],
+            'mobile' => ['required', 'string', 'regex:/^\d{10}$/'],
             'otp' => ['required', 'string', 'size:6'],
         ]);
 
-        $phone = $payload['phone'];
+        $mobile = $payload['mobile'];
         $otp = $payload['otp'];
 
-        // Verify OTP
-        if (!$this->otpService->verifyOtp($phone, $otp)) {
+        // 1. Verify via Cache (OtpService)
+        if (!$this->otpService->verifyOtp($mobile, $otp)) {
             return ApiResponse::error('Invalid or expired OTP.', 401);
         }
 
-        // Get or create user - login without KYC check
-        // Generate unique email from phone number
-        $phoneDigits = preg_replace('/[^0-9]/', '', $phone);
-        $generatedEmail = "phone_{$phoneDigits}@mcxapp.local";
+        // 2. Find or Create User in auth_users
+        $user = User::where('mobile', $mobile)->first();
 
-        $user = User::firstOrCreate(
-            ['phone' => $phone],
-            [
-                'name' => 'User', // Will be updated from KYC if available
-                'email' => $generatedEmail,
-                'password' => Hash::make('phone-auth-user'),
-                'is_verified' => false, // Will be set when KYC is approved
-                'can_trade' => false, // Admin needs to enable trading
-            ]
-        );
+        if (!$user) {
+             // Should have been created by sendOtp, but fallback for safety
+             $user = User::create([
+                'mobile' => $mobile,
+                'password' => Hash::make('otp-user-' . $mobile),
+             ]);
+        }
 
-        // Check KYC status separately (for frontend to know)
-        $kycRequest = KycRequest::whereHas('user', function ($query) use ($phone) {
-            $query->where('phone', $phone);
-        })->where('status', 'approved')->first();
+        if ($user->is_blocked) {
+            return ApiResponse::error('Your account has been blocked.', 403);
+        }
+
+        // 3. Mark as verified and clear OTP
+        $user->update([
+            'otp' => null,
+            'otp_verified' => true,
+        ]);
+
+        // 4. Generate Sanctum token
+        $token = $user->createToken('mobile-auth')->plainTextToken;
+
+        // 5. Build response profile (including VerifiedUser status)
+        $profile = $user->verifiedUser;
 
         return ApiResponse::success([
             'message' => 'Login successful.',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'email' => $user->email,
-                'is_verified' => $user->is_verified,
-                'can_trade' => $user->can_trade,
-                'kyc_approved' => (bool) $kycRequest, // For reference
+                'mobile' => $user->mobile,
+                'is_blocked' => $user->is_blocked,
+                'otp_verified' => $user->otp_verified,
+                'kyc_status' => $profile?->kyc_status ?? 'not_submitted',
+                'is_verified' => $profile?->kyc_status === 'approved',
+                'can_trade' => (bool) $profile?->is_trading_enabled,
             ],
-            'session_token' => 'mock-session-' . $user->id, // For demo purposes
+            'session_token' => $token,
         ]);
+    }
+
+    /**
+     * Get current user profile.
+     * 
+     * GET /api/v1/profile
+     */
+    public function profile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $kyc = $user->verifiedUser;
+
+        return ApiResponse::success([
+            'user' => [
+                'id' => $user->id,
+                'mobile' => $user->mobile,
+                'otp_verified' => $user->otp_verified,
+            ],
+            'kyc' => $kyc ? [
+                'full_name' => $kyc->full_name,
+                'email' => $kyc->email,
+                'status' => $kyc->kyc_status,
+                'gold_limit' => (float)$kyc->gold_limit,
+                'silver_limit' => (float)$kyc->silver_limit,
+                'trading_enabled' => (bool)$kyc->is_trading_enabled,
+            ] : null
+        ]);
+    }
+
+    /**
+     * Logout.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+        return ApiResponse::success(['message' => 'Logged out successfully.']);
     }
 }

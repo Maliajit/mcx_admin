@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('kyc_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('auth_users')->onDelete('cascade');
             $table->string('name');
             $table->string('pan');
             $table->string('aadhaar');

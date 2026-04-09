@@ -26,6 +26,9 @@ class Order extends Model
         'target_price',
         'approved_by',
         'approved_at',
+        'product_type',
+        'product_id',
+        'tax_amount',
     ];
 
     protected function casts(): array

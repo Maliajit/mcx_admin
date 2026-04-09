@@ -25,7 +25,7 @@ return new class extends Migration
             }
 
             if (!Schema::hasColumn('orders', 'approved_by')) {
-                $table->foreignId('approved_by')->nullable()->constrained('users')->onDelete('set null')->after('status');
+                $table->foreignId('approved_by')->nullable()->constrained('auth_users')->onDelete('set null')->after('status');
             }
 
             if (!Schema::hasColumn('orders', 'approved_at')) {

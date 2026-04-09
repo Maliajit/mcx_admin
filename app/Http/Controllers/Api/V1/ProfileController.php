@@ -3,44 +3,43 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\LocalAppUserResolver;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
-    public function __construct(
-        private readonly LocalAppUserResolver $userResolver,
-    ) {
-    }
-
+    /**
+     * Get authenticated user profile and KYC status.
+     * 
+     * GET /api/v1/profile
+     */
     public function __invoke(Request $request): JsonResponse
     {
-        $user = $this->userResolver->resolve($request);
-
-        $latestKycRequest = $user->kycRequests()->latest()->first();
+        $user = $request->user();
+        $kyc = $user->verifiedUser;
 
         return ApiResponse::success([
             'profile' => [
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'is_verified' => $user->is_verified,
-                'can_trade' => $user->can_trade,
-                'kyc_request' => $latestKycRequest ? [
-                    'id' => $latestKycRequest->id,
-                    'name' => $latestKycRequest->name,
-                    'pan' => $latestKycRequest->pan,
-                    'aadhaar' => $latestKycRequest->aadhaar,
-                    'status' => $latestKycRequest->status,
-                    'created_at' => $latestKycRequest->created_at->toIso8601String(),
-                    'approved_at' => optional($latestKycRequest->approved_at)->toIso8601String(),
+                'id' => $user->id,
+                'mobile' => $user->mobile,
+                'is_verified' => $kyc?->kyc_status === 'approved',
+                'kyc_status' => $kyc?->kyc_status ?? 'not_submitted',
+                'can_trade' => (bool) $kyc?->is_trading_enabled,
+                'limits' => [
+                    'gold' => (float) ($kyc?->gold_limit ?? 0),
+                    'silver' => (float) ($kyc?->silver_limit ?? 0),
+                ],
+                'kyc_details' => $kyc ? [
+                    'full_name' => $kyc->full_name,
+                    'pan' => $kyc->pan_number,
+                    'aadhaar' => $kyc->aadhaar_number,
+                    'submitted_at' => $kyc->created_at->toIso8601String(),
                 ] : null,
             ],
             'auth' => [
-                'type' => 'local',
-                'guard' => 'none',
+                'type' => 'otp',
+                'verified' => (bool) $user->otp_verified,
             ],
         ]);
     }

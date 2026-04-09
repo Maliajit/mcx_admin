@@ -3,48 +3,53 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\KycRequest;
-use App\Models\User;
+use App\Models\VerifiedUser;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
 class KycRequestsController extends Controller
 {
+    /**
+     * List all KYC/Profiling requests.
+     */
     public function index(): View
     {
-        $kycRequests = KycRequest::with('user')->latest()->get();
+        // Fetch users who have submitted KYC (i.e. have a verified_users record)
+        $kycRequests = VerifiedUser::with('user')->latest()->get();
 
         return view('admin.kyc.requests', compact('kycRequests'));
     }
 
-    public function approve(Request $request, KycRequest $kycRequest): RedirectResponse
+    /**
+     * Approve KYC.
+     */
+    public function approve(Request $request, VerifiedUser $verifiedUser): RedirectResponse
     {
-        if ($kycRequest->status !== 'pending') {
+        if ($verifiedUser->kyc_status !== 'pending') {
             return back()->with('error', 'KYC request is not pending.');
         }
 
-        $kycRequest->update([
-            'status' => 'approved',
-            'approved_by' => auth()->id(), // Assuming admin auth, but for demo use 1
-            'approved_at' => now(),
+        $verifiedUser->update([
+            'kyc_status' => 'approved',
+            'is_trading_enabled' => true, // Auto-enable trading on approval
         ]);
 
-        $kycRequest->user->update(['is_verified' => true]);
-
-        return back()->with('success', 'KYC request approved.');
+        return back()->with('success', 'KYC request approved and trading enabled.');
     }
 
-    public function reject(Request $request, KycRequest $kycRequest): RedirectResponse
+    /**
+     * Reject KYC.
+     */
+    public function reject(Request $request, VerifiedUser $verifiedUser): RedirectResponse
     {
-        if ($kycRequest->status !== 'pending') {
+        if ($verifiedUser->kyc_status !== 'pending') {
             return back()->with('error', 'KYC request is not pending.');
         }
 
-        $kycRequest->update([
-            'status' => 'rejected',
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
+        $verifiedUser->update([
+            'kyc_status' => 'rejected',
+            'is_trading_enabled' => false,
         ]);
 
         return back()->with('success', 'KYC request rejected.');

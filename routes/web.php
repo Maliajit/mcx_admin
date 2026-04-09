@@ -15,8 +15,9 @@ Route::get('/admin/dashboard', DashboardController::class);
 // User Management
 Route::get('/admin/users/requests', [KycRequestsController::class, 'index'])->name('kyc.requests');
 Route::post('/admin/users/{user}/enable-trading', [UsersController::class, 'enableTrading'])->name('users.enableTrading');
-Route::post('/admin/kyc/{kycRequest}/approve', [KycRequestsController::class, 'approve'])->name('admin.kyc.approve');
-Route::post('/admin/kyc/{kycRequest}/reject', [KycRequestsController::class, 'reject'])->name('admin.kyc.reject');
+Route::post('/admin/users/{user}/update-limits', [UsersController::class, 'updateLimits'])->name('users.updateLimits');
+Route::post('/admin/kyc/{verifiedUser}/approve', [KycRequestsController::class, 'approve'])->name('admin.kyc.approve');
+Route::post('/admin/kyc/{verifiedUser}/reject', [KycRequestsController::class, 'reject'])->name('admin.kyc.reject');
 
 // Order Management
 Route::get('/admin/orders', [OrderPagesController::class, 'index'])->name('orders.index');
@@ -31,5 +32,9 @@ Route::view('/admin/rates/gold', 'admin.rates.gold.index');
 Route::view('/admin/rates/silver', 'admin.rates.silver.index');
 Route::view('/admin/reports/history', 'admin.reports.history');
 
-Route::view('/admin/settings', 'admin.settings.index');
+Route::get('/admin/settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('admin.settings.index');
+Route::post('/admin/settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('admin.settings.update');
+
+Route::resource('admin/products', \App\Http\Controllers\Admin\ProductRowController::class)->names('admin.products');
+Route::resource('admin/coins', \App\Http\Controllers\Admin\CoinController::class)->names('admin.coins');
 Route::view('/admin/login', 'admin.auth.login.index');

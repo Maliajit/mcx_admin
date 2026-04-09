@@ -3,26 +3,37 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\VerifiedUser;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::updateOrCreate(
-            ['email' => 'test@example.com'],
+        // Create a test user in auth_users
+        $user = User::updateOrCreate(
+            ['mobile' => '9876543210'],
             [
-                'name' => 'Test User',
-                'phone' => '+91 9999999999',
-                'kyc_status' => 'unverified',
+                'otp_verified' => true,
+                'is_blocked' => false,
+            ]
+        );
+
+        // Create KYC details in verified_users
+        $user->verifiedUser()->updateOrCreate(
+            ['auth_user_id' => $user->id],
+            [
+                'full_name' => 'Demo Trader',
+                'email' => 'trader@mcx.in',
+                'pan_number' => 'ABCDE1234F',
+                'aadhaar_number' => '123456789012',
+                'kyc_status' => 'approved',
+                'gold_limit' => 100.00,
+                'silver_limit' => 5000.00,
+                'is_trading_enabled' => true,
             ]
         );
     }

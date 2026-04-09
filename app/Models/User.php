@@ -7,11 +7,19 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
+
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'auth_users';
 
     /**
      * The attributes that are mass assignable.
@@ -19,22 +27,10 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'email',
-        'phone',
-        'gst_number',
-        'pan_number',
-        'pan_image_path',
-        'aadhaar_number',
-        'aadhaar_front_image_path',
-        'aadhaar_back_image_path',
-        'selfie_image_path',
-        'selfie_reference',
-        'kyc_status',
-        'kyc_submitted_at',
-        'kyc_verified_at',
-        'is_verified',
-        'can_trade',
+        'mobile',
+        'otp',
+        'otp_verified',
+        'is_blocked',
         'password',
     ];
 
@@ -44,6 +40,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'otp',
         'password',
         'remember_token',
     ];
@@ -56,16 +53,26 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'kyc_submitted_at' => 'datetime',
-            'kyc_verified_at' => 'datetime',
+            'otp_verified' => 'boolean',
+            'is_blocked' => 'boolean',
             'password' => 'hashed',
         ];
     }
 
-    public function kycRequests()
+    /**
+     * Get the verified user details (KYC).
+     */
+    public function verifiedUser()
     {
-        return $this->hasMany(KycRequest::class);
+        return $this->hasOne(VerifiedUser::class, 'auth_user_id');
+    }
+
+    /**
+     * Alias for verifiedUser to stay compatible with existing code if needed
+     */
+    public function profile()
+    {
+        return $this->verifiedUser();
     }
 
     public function orders()

@@ -33,6 +33,16 @@
             <span>Completed Orders</span>
         </a>
 
+        <div class="menu-label">Product Management</div>
+        <a href="{{ route('admin.products.index') }}" class="menu-item {{ Request::is('admin/products*') ? 'active' : '' }}">
+            <i class="fa fa-box"></i>
+            <span>Product Rows</span>
+        </a>
+        <a href="{{ route('admin.coins.index') }}" class="menu-item {{ Request::is('admin/coins*') ? 'active' : '' }}">
+            <i class="fa fa-circle"></i>
+            <span>Coins</span>
+        </a>
+
         <div class="menu-label">Market Management</div>
         <a href="{{ url('/admin/rates/gold') }}" class="menu-item {{ Request::is('admin/rates/gold') ? 'active' : '' }}">
             <i class="fa fa-coins"></i>
@@ -51,8 +61,8 @@
 
         <div class="menu-label">System</div>
         <a href="{{ url('/admin/settings') }}" class="menu-item {{ Request::is('admin/settings') ? 'active' : '' }}">
-            <i class="fa fa-user-cog"></i>
-            <span>Admin Profile</span>
+            <i class="fa fa-cog"></i>
+            <span>Settings</span>
         </a>
         
         <a href="{{ url('/admin/login') }}" class="menu-item" style="margin-top: 20px; color: var(--danger);">

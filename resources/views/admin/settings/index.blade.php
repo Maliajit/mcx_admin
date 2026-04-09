@@ -1,53 +1,73 @@
 @extends('admin.layout.main')
 
-@section('title', 'Admin Profile')
-@section('page_title', 'Settings')
+@section('title', 'Trading Settings')
+@section('page_title', 'Trading Settings')
 
 @section('content')
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 32px;">
-    <!-- Profile Info -->
+    <!-- General Trading Settings -->
     <div class="section-card">
         <div class="section-header">
-            <h3>Update Profile Information</h3>
+            <h3>Global Pricing Settings</h3>
         </div>
         <div style="padding: 32px;">
-            <div class="form-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" class="form-control" value="Admin User">
-            </div>
-            <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" class="form-control" value="admin@example.com">
-            </div>
-            <div class="form-group">
-                <label for="mobile">Mobile Number</label>
-                <input type="text" id="mobile" class="form-control" value="+91 9876543210">
-            </div>
-            
-            <button class="btn btn-primary" style="width: 100%;">Save Profile Changes</button>
+            <form action="{{ route('admin.settings.update') }}" method="POST">
+                @csrf
+                
+                @if(session('success'))
+                    <div style="color: green; margin-bottom: 16px;">{{ session('success') }}</div>
+                @endif
+                
+                <div class="form-group">
+                    <label>Price Source</label>
+                    <select name="price_source" class="form-control">
+                        <option value="manual" {{ ($settings['price_source'] ?? 'manual') === 'manual' ? 'selected' : '' }}>Manual</option>
+                        <option value="api" {{ ($settings['price_source'] ?? '') === 'api' ? 'selected' : '' }}>API (Live Rates)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="gold_base_price">Gold Base Price (Manual)</label>
+                    <input type="number" step="0.01" name="gold_base_price" id="gold_base_price" class="form-control" value="{{ $settings['gold_base_price'] ?? '0' }}">
+                </div>
+                <div class="form-group">
+                    <label for="silver_base_price">Silver Base Price (Manual)</label>
+                    <input type="number" step="0.01" name="silver_base_price" id="silver_base_price" class="form-control" value="{{ $settings['silver_base_price'] ?? '0' }}">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Save Base Prices</button>
+            </form>
         </div>
     </div>
 
-    <!-- Password Change -->
+    <!-- Taxes and Theme -->
     <div class="section-card">
         <div class="section-header">
-            <h3>Change Password</h3>
+            <h3>Taxes & App Theme</h3>
         </div>
         <div style="padding: 32px;">
-            <div class="form-group">
-                <label for="current_password">Current Password</label>
-                <input type="password" id="current_password" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="new_password">New Password</label>
-                <input type="password" id="new_password" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">Confirm New Password</label>
-                <input type="password" id="confirm_password" class="form-control">
-            </div>
-            
-            <button class="btn btn-accent" style="width: 100%;">Update Password</button>
+            <form action="{{ route('admin.settings.update') }}" method="POST">
+                @csrf
+                
+                <div class="form-group">
+                    <label for="gst_percentage">GST Percentage (%)</label>
+                    <input type="number" step="0.01" name="gst_percentage" id="gst_percentage" class="form-control" value="{{ $settings['gst_percentage'] ?? '3.0' }}">
+                </div>
+                <div class="form-group">
+                    <label for="tds_percentage">TDS Percentage (%)</label>
+                    <input type="number" step="0.01" name="tds_percentage" id="tds_percentage" class="form-control" value="{{ $settings['tds_percentage'] ?? '1.0' }}">
+                </div>
+                <div class="form-group">
+                    <label for="primary_color">App Primary Color</label>
+                    <input type="color" name="primary_color" id="primary_color" class="form-control" style="height: 50px;" value="{{ $settings['primary_color'] ?? '#FFAA00' }}">
+                </div>
+                <div class="form-group">
+                    <label for="secondary_color">App Secondary Color</label>
+                    <input type="color" name="secondary_color" id="secondary_color" class="form-control" style="height: 50px;" value="{{ $settings['secondary_color'] ?? '#000000' }}">
+                </div>
+                
+                <button type="submit" class="btn btn-accent" style="width: 100%;">Update Settings</button>
+            </form>
         </div>
     </div>
 </div>

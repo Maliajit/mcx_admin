@@ -3,13 +3,12 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Services\LiveRates\LiveRatesService;
 use Illuminate\Support\Facades\Log;
 
 class PriceCheckService
 {
     public function __construct(
-        private readonly LiveRatesService $liveRatesService,
+        private readonly PriceService $priceService,
     ) {}
 
     public function checkWaitingOrders(): void
@@ -20,23 +19,30 @@ class PriceCheckService
             return;
         }
 
-        $liveRatesResult = $this->liveRatesService->getLiveRates();
+        $config = $this->priceService->getConfig();
+        $products = collect($config['products']);
+        $coins = collect($config['coins']);
 
-        if (!$liveRatesResult['success']) {
-            Log::warning('Price check failed: unable to fetch live rates');
-            return;
-        }
-
-        $liveRates = collect($liveRatesResult['data']['items']);
-
+        /** @var \App\Models\Order $order */
         foreach ($waitingOrders as $order) {
-            $matchingRate = $liveRates->firstWhere('name', $order->asset);
+            $currentPrice = null;
 
-            if (!$matchingRate) {
-                continue;
+            if ($order->product_type === 'row') {
+                $product = $products->firstWhere('id', $order->product_id);
+                if ($product) {
+                    $currentPrice = $product['final_price'];
+                }
+            } elseif ($order->product_type === 'coin') {
+                $coin = $coins->firstWhere('id', $order->product_id);
+                if ($coin) {
+                    $currentPrice = $coin['final_price'];
+                }
             }
 
-            $currentPrice = (float) $matchingRate['bid'];
+            if ($currentPrice === null) {
+                // If product doesn't exist or doesn't match new schema, skip
+                continue;
+            }
 
             if ($currentPrice <= (float) $order->target_price) {
                 $order->update(['status' => 'pending']);
