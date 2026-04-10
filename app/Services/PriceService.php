@@ -12,7 +12,8 @@ class PriceService
 {
     public function __construct(
         private readonly LiveRatesService $liveRatesService
-    ) {}
+    ) {
+    }
 
     /**
      * Get all dynamically calculated config data for Flutter App.
@@ -21,7 +22,7 @@ class PriceService
     {
         $settings = $this->getSettings();
         $basePrices = $this->getBasePrices($settings);
-        
+
         return [
             'base_prices' => $basePrices,
             'taxes' => [
@@ -52,7 +53,7 @@ class PriceService
     {
         $settings = $settings ?? $this->getSettings();
         $source = $settings['price_source'] ?? 'manual';
-        
+
         $goldPrice = (float) ($settings['gold_base_price'] ?? 0);
         $silverPrice = (float) ($settings['silver_base_price'] ?? 0);
 
@@ -60,12 +61,12 @@ class PriceService
             $liveResult = $this->liveRatesService->getLiveRates();
             if ($liveResult['success']) {
                 $items = collect($liveResult['data']['items'] ?? []);
-                
+
                 $liveGold = $items->firstWhere('symbol', 'GOLD') ?? $items->firstWhere('name', 'GOLD');
                 if ($liveGold) {
                     $goldPrice = (float) $liveGold['bid'];
                 }
-                
+
                 $liveSilver = $items->firstWhere('symbol', 'SILVER') ?? $items->firstWhere('name', 'SILVER');
                 if ($liveSilver) {
                     $silverPrice = (float) $liveSilver['bid'];
@@ -81,15 +82,25 @@ class PriceService
 
     public function getCalculatedProducts(array $basePrices = null): array
     {
+        $settings = $this->getSettings();
+        $gstPercent = (float) ($settings['gst_percentage'] ?? 3.0);
+        $tdsPercent = (float) ($settings['tds_percentage'] ?? 1.0);
+
         $basePrices = $basePrices ?? $this->getBasePrices();
         $products = ProductRow::where('is_active', true)->get();
 
         $calculated = [];
         foreach ($products as $product) {
             $base = $basePrices[$product->type] ?? 0;
-            // Intermediate price = base_price + margin + adjustment
+            // 1. Intermediate price = base_price + margin + adjustment
             $intermediatePrice = $base + $product->margin + $product->adjustment;
-            
+
+            // 2. Apply GST (adds to price)
+            $gstAmount = $intermediatePrice * ($gstPercent / 100);
+
+            // 3. Apply TDS (usually handled separately)
+            $tdsAmount = $intermediatePrice * ($tdsPercent / 100);
+
             $calculated[] = [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -97,7 +108,10 @@ class PriceService
                 'base_price' => (float) $base,
                 'margin' => (float) $product->margin,
                 'adjustment' => (float) $product->adjustment,
-                'final_price' => max(0, $intermediatePrice), 
+                'intermediate_price' => (float) $intermediatePrice,
+                'gst_amount' => (float) $gstAmount,
+                'tds_amount' => (float) $tdsAmount,
+                'final_price' => (float) ($intermediatePrice + $gstAmount),
             ];
         }
 
@@ -106,17 +120,27 @@ class PriceService
 
     public function getCalculatedCoins(array $basePrices = null): array
     {
+        $settings = $this->getSettings();
+        $gstPercent = (float) ($settings['gst_percentage'] ?? 3.0);
+        $tdsPercent = (float) ($settings['tds_percentage'] ?? 1.0);
+
         $basePrices = $basePrices ?? $this->getBasePrices();
         $coins = Coin::where('is_active', true)->get();
 
         $calculated = [];
         foreach ($coins as $coin) {
             $base = $basePrices[$coin->type] ?? 0;
-            $pricePerGram = $coin->type === 'gold' ? ($base / 10) : ($base / 1000); 
-            
+            $pricePerGram = $coin->type === 'gold' ? ($base / 10) : ($base / 1000);
+
             $coinBasePrice = $pricePerGram * $coin->weight_in_grams;
-            // Intermediate price = base_price + margin
+            // 1. Intermediate price = base_price + margin
             $intermediatePrice = $coinBasePrice + $coin->margin;
+
+            // 2. Apply GST
+            $gstAmount = $intermediatePrice * ($gstPercent / 100);
+
+            // 3. Apply TDS
+            $tdsAmount = $intermediatePrice * ($tdsPercent / 100);
 
             $calculated[] = [
                 'id' => $coin->id,
@@ -126,13 +150,16 @@ class PriceService
                 'weight_in_grams' => (float) $coin->weight_in_grams,
                 'margin' => (float) $coin->margin,
                 'adjustment' => 0,
-                'final_price' => max(0, $intermediatePrice),
+                'intermediate_price' => (float) $intermediatePrice,
+                'gst_amount' => (float) $gstAmount,
+                'tds_amount' => (float) $tdsAmount,
+                'final_price' => (float) ($intermediatePrice + $gstAmount),
             ];
         }
 
         return $calculated;
     }
-    
+
     /**
      * Compute total cost and taxes for an order
      */

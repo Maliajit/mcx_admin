@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -25,7 +24,7 @@ return new class extends Migration
             }
 
             if (!Schema::hasColumn('orders', 'approved_by')) {
-                $table->foreignId('approved_by')->nullable()->constrained('users')->onDelete('set null')->after('status');
+                $table->foreignId('approved_by')->nullable()->constrained('auth_users')->onDelete('set null')->after('status');
             }
 
             if (!Schema::hasColumn('orders', 'approved_at')) {
