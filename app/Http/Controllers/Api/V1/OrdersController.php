@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\LocalAppUserResolver;
+use App\Services\OrderLimitService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,16 +15,13 @@ class OrdersController extends Controller
 {
     public function __construct(
         private readonly LocalAppUserResolver $userResolver,
+        private readonly OrderLimitService $orderLimitService,
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
         $user = $this->userResolver->resolve($request);
-
-        if (!$user) {
-            return ApiResponse::error('Unauthenticated. Please log in.', 401);
-        }
 
         return ApiResponse::success([
             'items' => Order::query()
@@ -40,10 +38,6 @@ class OrdersController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $this->userResolver->resolve($request);
-
-        if (!$user) {
-            return ApiResponse::error('Unauthenticated. Please log in.', 401);
-        }
 
         if (!$user->is_verified) {
             return ApiResponse::error(
@@ -81,13 +75,26 @@ class OrdersController extends Controller
             'target_price' => ['nullable', 'numeric', 'min:0', 'required_if:type,limit'],
         ]);
 
+        try {
+            $this->orderLimitService->assertWithinRemainingLimit(
+                $user,
+                $payload['asset_name'],
+                $payload['product_type'],
+                (int) $payload['product_id'],
+                (float) $payload['quantity']
+            );
+        } catch (\Exception $exception) {
+            return ApiResponse::error($exception->getMessage(), 422);
+        }
+
         $priceService = app(\App\Services\PriceService::class);
         $taxCalculations = $priceService->calculateOrderTaxes(
             (float) $payload['price'],
             (float) $payload['quantity']
         );
 
-        $status = $payload['type'] === 'market' ? 'confirmed' : 'pending';
+        $isMarketOrder = $payload['type'] === 'market';
+        $status = $isMarketOrder ? 'confirmed' : 'pending';
 
         $order = Order::query()->create([
             'user_id' => $user->id,
@@ -102,8 +109,12 @@ class OrdersController extends Controller
             'target_price' => $payload['target_price'] ?? null,
             'status' => $status,
             'placed_at' => now(),
-            'approved_at' => $status === 'confirmed' ? now() : null,
+            'approved_at' => $isMarketOrder ? now() : null,
         ]);
+
+        if ($isMarketOrder) {
+            $this->orderLimitService->consumeRemainingLimit($order->load('user.verifiedUser'));
+        }
 
         return ApiResponse::success([
             'order' => $this->mapOrder($order),
@@ -117,10 +128,12 @@ class OrdersController extends Controller
             'id' => $order->id,
             'user_id' => $order->user_id,
             'asset' => $order->asset,
+            'asset_name' => $order->asset,
+            'product_type' => $order->product_type,
             'type' => $order->type,
-            'quantity' => $order->quantity,
-            'total' => number_format((float) $order->total, 2, '.', ''),
+            'quantity' => number_format((float) $order->quantity, 3, '.', ''),
             'price' => number_format((float) $order->price, 2, '.', ''),
+            'total' => number_format((float) $order->total, 2, '.', ''),
             'target_price' => $order->target_price ? number_format((float) $order->target_price, 2, '.', '') : null,
             'status' => $order->status,
             'placed_at' => optional($order->placed_at)->toIso8601String(),

@@ -19,10 +19,6 @@ class ProfileController extends Controller
     {
         $user = $this->userResolver->resolve($request);
 
-        if (!$user) {
-            return ApiResponse::error('Unauthenticated. Please log in.', 401);
-        }
-
         return ApiResponse::success([
             'profile' => [
                 'name' => $user->verifiedUser?->full_name ?? 'User',

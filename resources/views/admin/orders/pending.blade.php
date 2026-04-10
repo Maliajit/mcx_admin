@@ -9,7 +9,7 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-warning">
-                    <h3 class="card-title mb-0 text-dark">Awaiting Price Collision / Target Match</h3>
+                    <h3 class="card-title mb-0 text-dark">Pending Limit Orders Awaiting Target Hit</h3>
                 </div>
                 <div class="card-body">
                     @if(session('success'))
@@ -61,14 +61,14 @@
                                 <td class="bg-warning-light">
                                     <strong class="text-primary" style="font-size: 1.1rem;">₹{{ $order->target_price }}</strong>
                                 </td>
-                                <td><span class="badge badge-warning px-3 py-2 shadow-sm text-uppercase">WAITING</span></td>
+                                <td><span class="badge badge-warning px-3 py-2 shadow-sm text-uppercase">PENDING</span></td>
                                 <td>{{ $order->placed_at->format('d M, Y') }}<br><small class="text-muted">{{ $order->placed_at->format('H:i') }}</small></td>
                                 <td>
                                     <div class="btn-group w-100 shadow-sm">
                                         <form method="POST" action="{{ route('orders.approve', $order) }}" class="flex-grow-1 mr-1">
                                             @csrf
                                             <button type="submit" class="btn btn-success btn-sm btn-block font-weight-bold">
-                                                CONFIRM HIT
+                                                CONFIRM
                                             </button>
                                         </form>
                                         <form method="POST" action="{{ route('orders.reject', $order) }}" class="flex-grow-1">
@@ -93,7 +93,7 @@
                     <i class="fas fa-info-circle fa-2x mr-3 text-info"></i>
                     <div>
                         <h5 class="mb-1">What are Target Price Orders?</h5>
-                        <p class="mb-0 small">These are "Limit Orders" placed by users. They will remain here until the market price reaches their target. Click <strong>"Confirm Hit"</strong> to execute the trade and move it to the active confirmed list.</p>
+                        <p class="mb-0 small">These are limit orders placed by users. They stay here until the market price reaches the target, then they automatically move into the active confirmed orders list.</p>
                     </div>
                 </div>
             </div>

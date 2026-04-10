@@ -7,6 +7,11 @@ use Exception;
 
 class UserValidationService
 {
+    public function __construct(
+        private readonly OrderLimitService $orderLimitService,
+    ) {
+    }
+
     /**
      * Validate if a user can place an order.
      *
@@ -16,7 +21,13 @@ class UserValidationService
      * @return bool
      * @throws Exception
      */
-    public function validateForOrder(User $authUser, string $type, float $quantity): bool
+    public function validateForOrder(
+        User $authUser,
+        string $type,
+        float $quantity,
+        string $productType = 'row',
+        int $productId = 0
+    ): bool
     {
         // 1. Check otp_verified
         if (!$authUser->otp_verified) {
@@ -39,14 +50,14 @@ class UserValidationService
             throw new Exception("Trading is currently disabled for your account by the administrator.");
         }
 
-        // 5. Check user limits
-        if ($type === 'gold' && $quantity > (float)$verifiedUser->gold_limit) {
-            throw new Exception("Requested quantity exceeds your Gold trading limit of {$verifiedUser->gold_limit}g.");
-        }
-
-        if ($type === 'silver' && $quantity > (float)$verifiedUser->silver_limit) {
-            throw new Exception("Requested quantity exceeds your Silver trading limit of {$verifiedUser->silver_limit}g.");
-        }
+        $assetName = $type === 'silver' ? 'silver' : 'gold';
+        $this->orderLimitService->assertWithinRemainingLimit(
+            $authUser,
+            $assetName,
+            $productType,
+            $productId,
+            $quantity
+        );
 
         return true;
     }

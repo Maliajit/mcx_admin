@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 class OrderProcessingService
 {
     public function __construct(
-        private readonly PriceService $priceService
+        private readonly PriceService $priceService,
+        private readonly OrderLimitService $orderLimitService
     ) {}
 
     /**
@@ -86,6 +87,8 @@ class OrderProcessingService
                 'status' => 'confirmed',
                 'approved_at' => now(),
             ]);
+
+            $this->orderLimitService->consumeRemainingLimit($order->load('user.verifiedUser'));
 
             Log::info("Limit Order #{$order->id} Auto-Confirmed at Base: {$hitBasePrice}");
             return true;

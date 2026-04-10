@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\Order;
+use App\Services\OrderLimitService;
 use App\Services\OrderProcessingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -34,7 +35,8 @@ class OrderPagesController extends Controller
         return view('admin.orders.pending', [
             'orders' => Order::query()
                 ->where('status', 'pending')
-                    ->latest('placed_at')
+                ->where('type', 'limit')
+                ->latest('placed_at')
                 ->latest('id')
                 ->get(),
         ]);
@@ -77,7 +79,7 @@ class OrderPagesController extends Controller
     /**
      * Confirm a limit order (Limit Hit). Move to main orders.
      */
-    public function approve(Request $request, Order $order): RedirectResponse
+    public function approve(Request $request, Order $order, OrderLimitService $orderLimitService): RedirectResponse
     {
         if ($order->status !== 'pending') {
             return back()->with('error', 'Order is not in pending state.');
@@ -88,6 +90,8 @@ class OrderPagesController extends Controller
             'approved_by' => auth()->id(),
             'approved_at' => now(),
         ]);
+
+        $orderLimitService->consumeRemainingLimit($order->load('user.verifiedUser'));
 
         return back()->with('success', 'Limit order confirmed and moved to active orders.');
     }

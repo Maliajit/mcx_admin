@@ -27,10 +27,6 @@ class KycController extends Controller
 
         $user = $this->userResolver->resolve($request);
 
-        if (!$user) {
-            return ApiResponse::error('Unauthenticated. Please log in to submit KYC.', 401);
-        }
-
         // Update or create verified user details
         $verifiedUser = VerifiedUser::updateOrCreate(
             ['auth_user_id' => $user->id],
