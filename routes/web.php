@@ -39,4 +39,6 @@ Route::post('/admin/settings', [\App\Http\Controllers\Admin\SettingsController::
 
 Route::resource('admin/products', \App\Http\Controllers\Admin\ProductRowController::class)->names('admin.products');
 Route::resource('admin/coins', \App\Http\Controllers\Admin\CoinController::class)->names('admin.coins');
+Route::resource('admin/news', \App\Http\Controllers\Admin\NewsController::class)->names('admin.news');
+
 Route::view('/admin/login', 'admin.auth.login.index');
