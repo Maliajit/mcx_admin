@@ -17,10 +17,17 @@ class OrdersController extends Controller
     ) {
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $user = $this->userResolver->resolve($request);
+
+        if (!$user) {
+            return ApiResponse::error('Unauthenticated. Please log in.', 401);
+        }
+
         return ApiResponse::success([
             'items' => Order::query()
+                ->where('user_id', $user->id)
                 ->latest('placed_at')
                 ->latest('id')
                 ->get()
@@ -109,8 +116,10 @@ class OrdersController extends Controller
         return [
             'id' => $order->id,
             'user_id' => $order->user_id,
-            'asset_name' => $order->asset,
+            'asset' => $order->asset,
             'type' => $order->type,
+            'quantity' => $order->quantity,
+            'total' => number_format((float) $order->total, 2, '.', ''),
             'price' => number_format((float) $order->price, 2, '.', ''),
             'target_price' => $order->target_price ? number_format((float) $order->target_price, 2, '.', '') : null,
             'status' => $order->status,
