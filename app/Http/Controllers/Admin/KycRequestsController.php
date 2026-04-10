@@ -30,12 +30,19 @@ class KycRequestsController extends Controller
             return back()->with('error', 'KYC request is not pending.');
         }
 
-        $verifiedUser->update([
-            'kyc_status' => 'approved',
-            'is_trading_enabled' => true, // Auto-enable trading on approval
+        $data = $request->validate([
+            'gold_limit' => 'nullable|numeric|min:0',
+            'silver_limit' => 'nullable|numeric|min:0',
         ]);
 
-        return back()->with('success', 'KYC request approved and trading enabled.');
+        $verifiedUser->update([
+            'kyc_status' => 'approved',
+            'is_trading_enabled' => true,
+            'gold_limit' => $data['gold_limit'] ?? 100,   // default 100g gold
+            'silver_limit' => $data['silver_limit'] ?? 10000, // default 10kg silver
+        ]);
+
+        return back()->with('success', 'KYC approved, trading enabled, and limits set.');
     }
 
     /**

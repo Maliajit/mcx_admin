@@ -24,7 +24,7 @@ class OrdersController extends Controller
                 ->latest('placed_at')
                 ->latest('id')
                 ->get()
-                ->map(fn (Order $order): array => $this->mapOrder($order))
+                ->map(fn(Order $order): array => $this->mapOrder($order))
                 ->all(),
             'message' => 'Orders loaded successfully.',
         ]);
@@ -33,6 +33,10 @@ class OrdersController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $this->userResolver->resolve($request);
+
+        if (!$user) {
+            return ApiResponse::error('Unauthenticated. Please log in.', 401);
+        }
 
         if (!$user->is_verified) {
             return ApiResponse::error(
@@ -63,20 +67,35 @@ class OrdersController extends Controller
         $payload = $request->validate([
             'asset_name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', Rule::in(['market', 'limit'])],
-            'price' => ['required', 'numeric', 'min:0'],
+            'product_type' => ['required', 'string', Rule::in(['row', 'coin'])],
+            'product_id' => ['required', 'integer'],
+            'quantity' => ['required', 'numeric', 'min:0'],
+            'price' => ['required', 'numeric', 'min:0'], // This is intermediate price from UI
             'target_price' => ['nullable', 'numeric', 'min:0', 'required_if:type,limit'],
         ]);
 
-        $status = $payload['type'] === 'market' ? 'pending' : 'waiting';
+        $priceService = app(\App\Services\PriceService::class);
+        $taxCalculations = $priceService->calculateOrderTaxes(
+            (float) $payload['price'],
+            (float) $payload['quantity']
+        );
+
+        $status = $payload['type'] === 'market' ? 'confirmed' : 'pending';
 
         $order = Order::query()->create([
             'user_id' => $user->id,
             'asset' => $payload['asset_name'],
+            'product_type' => $payload['product_type'],
+            'product_id' => $payload['product_id'],
             'type' => $payload['type'],
-            'price' => $payload['price'],
+            'quantity' => $payload['quantity'],
+            'price' => $payload['price'], // Base Intermediate Price
+            'tax_amount' => $taxCalculations['gst_amount'],
+            'total' => $taxCalculations['grand_total'], // Includes GST + TDS (user pays both as per current helper)
             'target_price' => $payload['target_price'] ?? null,
             'status' => $status,
             'placed_at' => now(),
+            'approved_at' => $status === 'confirmed' ? now() : null,
         ]);
 
         return ApiResponse::success([

@@ -79,4 +79,17 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class);
     }
+
+    /**
+     * Helper mutators for KYC status used by OrdersController
+     */
+    public function getIsVerifiedAttribute(): bool
+    {
+        return $this->verifiedUser?->kyc_status === 'approved';
+    }
+
+    public function getCanTradeAttribute(): bool
+    {
+        return (bool) $this->verifiedUser?->is_trading_enabled;
+    }
 }

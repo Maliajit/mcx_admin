@@ -182,7 +182,7 @@ class PriceService
             'tds_percent' => $tdsPercent,
             'tds_amount' => $tdsAmount,
             'total_tax' => $gstAmount + $tdsAmount,
-            'grand_total' => $subtotal + $gstAmount + $tdsAmount,
+            'grand_total' => $subtotal + $gstAmount, // Only GST adds to weight-based price
         ];
     }
 }

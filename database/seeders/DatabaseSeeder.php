@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\TradingSetting;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -38,5 +39,20 @@ class DatabaseSeeder extends Seeder
                 'is_trading_enabled' => true,
             ]
         );
+
+        // 3. Seed default trading settings
+        $settings = [
+            'gst_percentage' => '3.0',
+            'tds_percentage' => '1.0',
+            'price_source' => 'manual',
+            'gold_base_price' => '62500.00',
+            'silver_base_price' => '72000.00',
+            'primary_color' => '#FFAA00',
+            'secondary_color' => '#000000',
+        ];
+
+        foreach ($settings as $key => $value) {
+            TradingSetting::updateOrCreate(['key' => $key], ['value' => $value]);
+        }
     }
 }
