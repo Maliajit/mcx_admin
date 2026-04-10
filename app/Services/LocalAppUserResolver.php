@@ -25,27 +25,12 @@ class LocalAppUserResolver
         // Fallback to demo user for development
         /** @var User $user */
         $user = User::query()->firstOrCreate(
-            ['email' => (string) config('api.auth.demo_profile.email')],
+            ['mobile' => '9876543210'],
             [
-                'name' => (string) config('api.auth.demo_profile.name'),
-                'phone' => (string) config('api.auth.demo_profile.phone'),
                 'password' => Hash::make('local-app-user'),
+                'otp_verified' => true,
             ],
         );
-
-        $updates = [];
-
-        if ($user->name !== (string) config('api.auth.demo_profile.name')) {
-            $updates['name'] = (string) config('api.auth.demo_profile.name');
-        }
-
-        if ($user->phone !== (string) config('api.auth.demo_profile.phone')) {
-            $updates['phone'] = (string) config('api.auth.demo_profile.phone');
-        }
-
-        if ($updates !== []) {
-            $user->fill($updates)->save();
-        }
 
         return $user->fresh();
     }

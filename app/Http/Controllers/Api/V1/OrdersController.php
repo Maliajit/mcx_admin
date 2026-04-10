@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Services\PriceService;
-use App\Services\UserValidationService;
+use App\Services\LocalAppUserResolver;
 use App\Support\ApiResponse;
-use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,18 +13,14 @@ use Illuminate\Validation\Rule;
 class OrdersController extends Controller
 {
     public function __construct(
-        private readonly PriceService $priceService,
-        private readonly UserValidationService $validationService,
+        private readonly LocalAppUserResolver $userResolver,
     ) {
     }
 
-    /**
-     * List user orders.
-     */
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
         return ApiResponse::success([
-            'items' => $request->user()->orders()
+            'items' => Order::query()
                 ->latest('placed_at')
                 ->latest('id')
                 ->get()
@@ -36,71 +30,50 @@ class OrdersController extends Controller
         ]);
     }
 
-    /**
-     * Place a new order.
-     */
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->userResolver->resolve($request);
 
-        // 1. Basic Payload Validation
+        if (!$user->is_verified) {
+            return ApiResponse::error(
+                'KYC verification is required before placing an order.',
+                403,
+                [
+                    'code' => 'kyc_required',
+                    'profile' => [
+                        'is_verified' => false,
+                    ],
+                ],
+            );
+        }
+
+        if (!$user->can_trade) {
+            return ApiResponse::error(
+                'Trading is not enabled for your account.',
+                403,
+                [
+                    'code' => 'trading_disabled',
+                    'profile' => [
+                        'can_trade' => false,
+                    ],
+                ],
+            );
+        }
+
         $payload = $request->validate([
-            'product_type' => ['required', 'string', Rule::in(['row', 'coin'])],
-            'product_id' => ['required', 'integer'],
+            'asset_name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', Rule::in(['market', 'limit'])],
-            'quantity' => ['required', 'numeric', 'min:0.0001'],
+            'price' => ['required', 'numeric', 'min:0'],
             'target_price' => ['nullable', 'numeric', 'min:0', 'required_if:type,limit'],
         ]);
 
-        // 2. Identify Product and Metal Type
-        $config = $this->priceService->getConfig();
-        $targetProduct = null;
-        $metalType = 'gold';
-
-        if ($payload['product_type'] === 'row') {
-            $targetProduct = collect($config['products'])->firstWhere('id', $payload['product_id']);
-        } else {
-            $targetProduct = collect($config['coins'])->firstWhere('id', $payload['product_id']);
-        }
-
-        if (!$targetProduct) {
-            return ApiResponse::error('Invalid product selected.', 422);
-        }
-
-        $metalType = $targetProduct['type']; // 'gold' or 'silver'
-
-        // 3. Service Layer Validation (OTP, KYC, Trading Status, Limits)
-        try {
-            // Calculate effective weight if it's a coin for limit calculation
-            // Note: Our validation service checks against limits. 
-            // We should ensure we pass the 'weight' to the service if limits are weight-based.
-            $effectiveWeight = (float) $payload['quantity'];
-            if ($payload['product_type'] === 'coin') {
-                $effectiveWeight = $payload['quantity'] * $targetProduct['weight_in_grams'];
-            }
-
-            $this->validationService->validateForOrder($user, $metalType, $effectiveWeight);
-        } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 403);
-        }
-
-        // 4. Pricing & Tax Calculation
-        $executionPrice = $targetProduct['final_price'];
-        $taxes = $this->priceService->calculateOrderTaxes($executionPrice, $payload['quantity']);
-
-        // 5. Create Order
-        $status = $payload['type'] === 'market' ? 'confirmed' : 'pending';
+        $status = $payload['type'] === 'market' ? 'pending' : 'waiting';
 
         $order = Order::query()->create([
             'user_id' => $user->id,
-            'asset' => $targetProduct['name'],
-            'product_type' => $payload['product_type'],
-            'product_id' => $payload['product_id'],
-            'quantity' => $payload['quantity'],
+            'asset' => $payload['asset_name'],
             'type' => $payload['type'],
-            'price' => $executionPrice,
-            'tax_amount' => $taxes['total_tax'],
-            'total' => $taxes['grand_total'],
+            'price' => $payload['price'],
             'target_price' => $payload['target_price'] ?? null,
             'status' => $status,
             'placed_at' => now(),
@@ -116,18 +89,14 @@ class OrdersController extends Controller
     {
         return [
             'id' => $order->id,
+            'user_id' => $order->user_id,
             'asset_name' => $order->asset,
-            'product_type' => $order->product_type,
-            'product_id' => $order->product_id,
-            'quantity' => (float)$order->quantity,
             'type' => $order->type,
             'price' => number_format((float) $order->price, 2, '.', ''),
-            'tax_amount' => number_format((float) $order->tax_amount, 2, '.', ''),
-            'total' => number_format((float) $order->total, 2, '.', ''),
             'target_price' => $order->target_price ? number_format((float) $order->target_price, 2, '.', '') : null,
             'status' => $order->status,
-            'placed_at' => $order->placed_at ? $order->placed_at->toIso8601String() : null,
-            'approved_at' => $order->approved_at ? $order->approved_at->toIso8601String() : null,
+            'placed_at' => optional($order->placed_at)->toIso8601String(),
+            'approved_at' => optional($order->approved_at)->toIso8601String(),
         ];
     }
 }

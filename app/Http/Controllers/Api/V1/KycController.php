@@ -7,94 +7,58 @@ use App\Models\VerifiedUser;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Services\LocalAppUserResolver;
 
 class KycController extends Controller
 {
-    /**
-     * Submit KYC documentation.
-     * 
-     * POST /api/v1/profile/kyc
-     */
+    public function __construct(
+        private readonly LocalAppUserResolver $userResolver,
+    ) {
+    }
+
     public function store(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        // 1. Identify Existing Status
-        $verifiedUser = $user->verifiedUser;
-        if ($verifiedUser && in_array($verifiedUser->kyc_status, ['pending', 'approved'])) {
-            return ApiResponse::error('KYC request already exists or is already approved.', 400);
-        }
-
-        // 2. Validate Inputs
         $payload = $request->validate([
-            'full_name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'pan_number' => ['required', 'string', 'max:20'],
-            'aadhaar_number' => ['required', 'string', 'max:20'],
-            'pan_image' => ['required', 'image', 'max:5120'], // 5MB limit
-            'aadhaar_image' => ['required', 'image', 'max:5120'],
-            'selfie_image' => ['nullable', 'image', 'max:5120'],
+            'name' => ['required', 'string', 'max:255'],
+            'pan' => ['required', 'string', 'max:20'],
+            'aadhaar' => ['required', 'string', 'max:20'],
+            'email' => ['nullable', 'email'],
         ]);
 
-        // 3. Handle File Uploads
-        $panPath = $request->file('pan_image')->store('kyc/pan', 'public');
-        $aadhaarPath = $request->file('aadhaar_image')->store('kyc/aadhaar', 'public');
-        $selfiePath = $request->hasFile('selfie_image') 
-            ? $request->file('selfie_image')->store('kyc/selfie', 'public') 
-            : null;
+        $user = $this->userResolver->resolve($request);
 
-        // 4. Update or Create VerifiedUser record
-        $kyc = VerifiedUser::updateOrCreate(
+        // Update or create verified user details
+        $verifiedUser = VerifiedUser::updateOrCreate(
             ['auth_user_id' => $user->id],
             [
-                'full_name' => $payload['full_name'],
-                'email' => $payload['email'],
-                'pan_number' => strtoupper($payload['pan_number']),
-                'aadhaar_number' => preg_replace('/\s+/', '', $payload['aadhaar_number']),
-                'pan_image' => $panPath,
-                'aadhaar_image' => $aadhaarPath,
-                'selfie_image' => $selfiePath,
-                'kyc_status' => 'pending', // Re-verify if it was rejected before
+                'full_name' => $payload['name'],
+                'pan_number' => strtoupper($payload['pan']),
+                'aadhaar_number' => preg_replace('/\s+/', '', $payload['aadhaar']),
+                'email' => $payload['email'] ?? null,
+                'kyc_status' => 'pending', // Reset to pending on update
             ]
         );
 
-        return ApiResponse::success([
-            'message' => 'KYC documents submitted successfully. Please wait for administrator approval.',
-            'kyc' => [
-                'full_name' => $kyc->full_name,
-                'status' => $kyc->kyc_status,
-                'submitted_at' => $kyc->updated_at->toIso8601String(),
-            ]
-        ]);
-    }
-
-    /**
-     * Get current KYC status.
-     * 
-     * GET /api/v1/profile/kyc-status
-     */
-    public function status(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        $kyc = $user->verifiedUser;
-
-        if (!$kyc) {
-            return ApiResponse::success([
-                'status' => 'not_submitted',
-                'message' => 'KYC documents not yet submitted.',
-            ]);
+        // Handle image uploads if present
+        if ($request->hasFile('pan_image')) {
+            $verifiedUser->update(['pan_image' => $request->file('pan_image')->store('kyc/pan', 'public')]);
+        }
+        if ($request->hasFile('aadhaar_front_image')) {
+            $verifiedUser->update(['aadhaar_image' => $request->file('aadhaar_front_image')->store('kyc/aadhaar', 'public')]);
+        }
+        if ($request->hasFile('selfie_image')) {
+            $verifiedUser->update(['selfie_image' => $request->file('selfie_image')->store('kyc/selfie', 'public')]);
         }
 
         return ApiResponse::success([
-            'status' => $kyc->kyc_status,
-            'full_name' => $kyc->full_name,
-            'is_trading_enabled' => (bool)$kyc->is_trading_enabled,
-            'limits' => [
-                'gold' => (float)$kyc->gold_limit,
-                'silver' => (float)$kyc->silver_limit,
+            'message' => 'KYC request submitted successfully.',
+            'profile' => [
+                'name' => $verifiedUser->full_name,
+                'email' => $verifiedUser->email,
+                'phone' => $user->mobile,
+                'kyc_status' => $verifiedUser->kyc_status,
+                'is_verified' => false,
             ],
-            'message' => 'KYC status retrieved successfully.',
         ]);
     }
 }
